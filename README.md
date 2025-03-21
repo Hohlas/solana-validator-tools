@@ -9,3 +9,20 @@ To try the script, unzip the sample file and run  `ruby process_log_slot_timing.
 
 ### Footnotes:
 - The Ruby script is WIP and I still need to refactor that + some performance optimizations. Nonetheless, this is quick & dirty & it works.
+
+<details>
+<summary>Ruby setup</summary>
+
+```bash
+apt update && apt install ruby -y
+```
+
+</details>
+
+```bash
+cd
+git clone https://github.com/Hohlas/solana-validator-tools.git --recurse-submodules validator_tools
+cd validator_tools
+cp ~/solana/solana.log ~/validator_tools/solana.log
+ruby process_log_slot_timing.rb solana.log
+```
