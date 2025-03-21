@@ -1,7 +1,3 @@
-# Usage:
-# ruby process_log_slot_timing.rb [Uncompressed log file]
-# Then look at the output CSV file.
-
 require 'time'
 require 'csv'
 require_relative 'monkey_patches.rb'
@@ -42,61 +38,56 @@ File.foreach(input_file) do |line|
   end
 end
 
-# Calculate the latency between the current new_fork message and the parent
-# new fork message.
-slot_times.each do |k,v|
-  # puts "#{k} => #{v.inspect}"
-  slot_times[k][:latency_new_fork] = \
-    v[:new_fork_at] - slot_times[v[:parent]][:new_fork_at] \
-    unless slot_times[v[:parent]].nil? || v[:voting_at].nil?
+# Calculate the latency between the current new_fork message and the parent new fork message
+slot_times.each do |k, v|
+  if slot_times[v[:parent]].nil? || v[:voting_at].nil? || v[:new_fork_at].nil? || slot_times[v[:parent]][:new_fork_at].nil?
+    slot_times[k][:latency_new_fork] = nil
+  else
+    slot_times[k][:latency_new_fork] = v[:new_fork_at] - slot_times[v[:parent]][:new_fork_at]
+  end
 end
 
-# calculate some stats
-elapsed_times_frozen = slot_times.map{|k,v| v[:et_frozen] }.compact
-elapsed_times_voting = slot_times.map{|k,v| v[:et_voting] }.compact
-elapsed_times_total  = slot_times.map{|k,v| v[:et_total] }.compact
-latencies_new_fork = slot_times.map{|k,v| v[:latency_new_fork] }.compact
-# puts elapsed_times_frozen.inspect
+# Calculate some stats
+elapsed_times_frozen = slot_times.map { |k, v| v[:et_frozen] }.compact
+elapsed_times_voting = slot_times.map { |k, v| v[:et_voting] }.compact
+elapsed_times_total  = slot_times.map { |k, v| v[:et_total] }.compact
+latencies_new_fork = slot_times.map { |k, v| v[:latency_new_fork] }.compact
 new_leader_new_fork_latencies = []
 
-CSV.open("#{input_file}.csv", 'w') do |csv|
+CSV.open("#{input_file}.csv", 'w', col_sep: ';') do |csv|
   csv << %w[slot parent new_fork_at frozen_at voting_at elapsed_time_frozen elapsed_time_voting elapsed_time_total latency_new_fork slot_sequence comments]
   # Stats Header
   csv << [
-    'Average',nil,nil,nil,nil,
-    (elapsed_times_frozen.sum/elapsed_times_frozen.length.to_f).round(6),
-    (elapsed_times_voting.sum/elapsed_times_voting.length.to_f).round(6),
-    (elapsed_times_total.sum/elapsed_times_total.length.to_f).round(6),
-    (latencies_new_fork.sum/latencies_new_fork.length.to_f).round(6),
-    nil,
-    nil
+    'Average', nil, nil, nil, nil,
+    elapsed_times_frozen.empty? ? nil : (elapsed_times_frozen.sum / elapsed_times_frozen.length.to_f).round(6),
+    elapsed_times_voting.empty? ? nil : (elapsed_times_voting.sum / elapsed_times_voting.length.to_f).round(6),
+    elapsed_times_total.empty? ? nil : (elapsed_times_total.sum / elapsed_times_total.length.to_f).round(6),
+    latencies_new_fork.empty? ? nil : (latencies_new_fork.sum / latencies_new_fork.length.to_f).round(6),
+    nil, nil
   ]
 
   csv << [
-    'Median',nil,nil,nil,nil,
-    elapsed_times_frozen.median.round(6),
-    elapsed_times_voting.median.round(6),
-    elapsed_times_total.median.round(6),
-    latencies_new_fork.median.round(6),
-    nil,
-    nil
+    'Median', nil, nil, nil, nil,
+    elapsed_times_frozen.empty? ? nil : elapsed_times_frozen.median.round(6),
+    elapsed_times_voting.empty? ? nil : elapsed_times_voting.median.round(6),
+    elapsed_times_total.empty? ? nil : elapsed_times_total.median.round(6),
+    latencies_new_fork.empty? ? nil : latencies_new_fork.median.round(6),
+    nil, nil
   ]
 
   # Detail Rows
-  slot_times.each do |k,v|
-    new_fork_at_iso = v[:new_fork_at].iso8601(6) rescue nil
-    frozen_at_iso = v[:frozen_at].iso8601(6) rescue nil
-    voting_at_iso = v[:voting_at].iso8601(6) rescue nil
+  slot_times.each do |k, v|
+    new_fork_at_iso = v[:new_fork_at]&.iso8601(6)
+    frozen_at_iso = v[:frozen_at]&.iso8601(6)
+    voting_at_iso = v[:voting_at]&.iso8601(6)
 
     # Comments
     comments = []
     if k.modulo(4).zero? && !voting_at_iso.nil?
       comments << 'New Leader'
-      new_leader_new_fork_latencies << v[:latency_new_fork]
+      new_leader_new_fork_latencies << v[:latency_new_fork] if v[:latency_new_fork]
     end
-    if voting_at_iso.nil?
-      comments << 'Skipped Slot'
-    end
+    comments << 'Skipped Slot' if voting_at_iso.nil?
 
     csv << [
       k,
@@ -104,15 +95,16 @@ CSV.open("#{input_file}.csv", 'w') do |csv|
       new_fork_at_iso,
       frozen_at_iso,
       voting_at_iso,
-      v[:et_frozen].nil? ? nil : v[:et_frozen].round(6),
-      v[:et_voting].nil? ? nil : v[:et_voting].round(6),
-      v[:et_total].nil? ? nil : v[:et_total].round(6),
-      v[:latency_new_fork].nil? ? nil : v[:latency_new_fork].round(6),
+      v[:et_frozen]&.round(6),
+      v[:et_voting]&.round(6),
+      v[:et_total]&.round(6),
+      v[:latency_new_fork]&.round(6),
       k.modulo(4),
       comments.join(', ')
     ]
   end
 end
+
 puts ''
-puts "Average new_leader_new_fork_latencies is #{(new_leader_new_fork_latencies.sum / new_leader_new_fork_latencies.length.to_f).round(6)}"
-puts "Median new_leader_new_fork_latencies is #{new_leader_new_fork_latencies.median.round(6)}"
+puts "Average new_leader_new_fork_latencies is #{new_leader_new_fork_latencies.empty? ? 'N/A' : (new_leader_new_fork_latencies.sum / new_leader_new_fork_latencies.length.to_f).round(6)}"
+puts "Median new_leader_new_fork_latencies is #{new_leader_new_fork_latencies.empty? ? 'N/A' : new_leader_new_fork_latencies.median.round(6)}"
