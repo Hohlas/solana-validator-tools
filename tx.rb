@@ -10,18 +10,32 @@ class TX
   end
 
   def parse_new_fork
-    @slot = @log_line.between('new fork:', 'parent').strip.to_i
-    @parent = @log_line.between('parent:', ' ').strip.to_i
-    @timestamp = Time.parse(@log_line.between(']: [', 'INFO').strip)
+    # Используем регулярное выражение для гибкого парсинга
+    slot_match = @log_line.match(/new fork:(\d+)/)
+    @slot = slot_match[1].to_i if slot_match
+    parent_match = @log_line.match(/parent:(\d+)/)
+    @parent = parent_match[1].to_i if parent_match
+    timestamp_match = @log_line.match(/\[(.*?)\s+INFO/)
+    @timestamp = Time.parse(timestamp_match[1]) if timestamp_match
   end
 
   def parse_frozen
-    @slot = "#{@log_line}[E]".between('replay_stage] bank frozen:', '[E]').strip.to_i
-    @timestamp = Time.parse(@log_line.between(']: [', 'INFO').strip)
+    slot_match = @log_line.match(/bank frozen:\s*(\d+)/)
+    @slot = slot_match[1].to_i if slot_match
+    timestamp_match = @log_line.match(/\[(.*?)\s+INFO/)
+    @timestamp = Time.parse(timestamp_match[1]) if timestamp_match
   end
 
   def parse_voting
-    @slot = @log_line.between('voting:', ' 0').strip.to_i
-    @timestamp = Time.parse(@log_line.between(']: [', 'INFO').strip)
+    # Парсим слот после 'voting:', игнорируя, что идёт дальше
+    slot_match = @log_line.match(/voting:\s*(\d+)/)
+    if slot_match
+      @slot = slot_match[1].to_i
+    else
+      puts "WARNING: Could not parse slot in voting line: #{@log_line}"
+      @slot = nil
+    end
+    timestamp_match = @log_line.match(/\[(.*?)\s+INFO/)
+    @timestamp = Time.parse(timestamp_match[1]) if timestamp_match
   end
 end
