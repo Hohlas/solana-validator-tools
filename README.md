@@ -1,5 +1,5 @@
 # solana-validator-tools
-fork from [https://github.com/Hohlas/solana-validator-tools/tree/main](https://github.com/Block-Logic/solana-validator-tools)
+fork from https://github.com/Block-Logic/solana-validator-tools
 
 Here are some of the tools that I use for Solana validator log analysis. Most of the script are written in Ruby and any recent version of Ruby on your system should work.
 
